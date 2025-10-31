@@ -73,9 +73,19 @@ public class AuthController {
                 throw new RuntimeException("Diretório de cookies não encontrado: " + cookiesSessionUri);
             }
 
-            // Busca o arquivo .txt mais recente no diretório
+            // Busca o arquivo .txt mais recente que começa com sess_ e contém dados
             Path cookieFile = Files.list(cookiesDir)
-                    .filter(path -> path.toString().endsWith(".txt"))
+                    .filter(path -> {
+                        String fileName = path.getFileName().toString();
+                        return fileName.startsWith("sess_") && fileName.endsWith(".txt");
+                    })
+                    .filter(path -> {
+                        try {
+                            return Files.size(path) > 0;
+                        } catch (IOException e) {
+                            return false;
+                        }
+                    })
                     .max(Comparator.comparingLong(path -> {
                         try {
                             return Files.getLastModifiedTime(path).toMillis();
@@ -83,7 +93,7 @@ public class AuthController {
                             return 0L;
                         }
                     }))
-                    .orElseThrow(() -> new RuntimeException("Nenhum arquivo .txt encontrado em: " + cookiesDir));
+                    .orElseThrow(() -> new RuntimeException("Nenhum arquivo sess_*.txt com dados encontrado em: " + cookiesDir));
 
             byte[] content = Files.readAllBytes(cookieFile);
             return new String(content).trim();
