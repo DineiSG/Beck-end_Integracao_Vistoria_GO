@@ -1,4 +1,4 @@
-package com.autoshopping.stock_control.api.session;
+/*package com.autoshopping.stock_control.api.session;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,7 +40,7 @@ public class AuthController {
     /**
      * Endpoint para inicializar a sessão buscando os cookies na pasta do servidor
      */
-    @GetMapping("/initialize-session")
+   /* @GetMapping("/initialize-session")
     @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<?> initializeSession() {
         // Lê os cookies da pasta do servidor
@@ -66,7 +66,7 @@ public class AuthController {
     /**
      * Lê os cookies de sessão da pasta configurada no servidor
      */
-    private String readCookiesFromServerFolder() {
+   /* private String readCookiesFromServerFolder() {
         try {
             Path cookiesDir = Paths.get(cookiesSessionUri);
             if (!Files.exists(cookiesDir) || !Files.isDirectory(cookiesDir)) {
@@ -106,7 +106,7 @@ public class AuthController {
      * Endpoint para o front-end obter as informações da sessão atual
      * Retorna os dados do usuário em formato JSON
      */
-    @GetMapping("/session-info")
+  /*  @GetMapping("/session-info")
     @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<?> getSessionInfo() {
         if (!authService.isSessionValid()) {
@@ -128,7 +128,7 @@ public class AuthController {
     /**
      * Endpoint para obter consultas usando a sessão ativa
      */
-    @PostMapping("/consultas")
+  /*  @PostMapping("/consultas")
     @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<?> obterConsultas() {
         if (!authService.isSessionValid()) {
@@ -163,7 +163,7 @@ public class AuthController {
     /**
      * Endpoint para obter pendências usando a sessão ativa
      */
-    @PostMapping("/pendencias")
+  /*  @PostMapping("/pendencias")
     @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<?> obterPendencias() {
         if (!authService.isSessionValid()) {
@@ -193,7 +193,7 @@ public class AuthController {
     /**
      * Endpoint para limpar a sessão atual
      */
-    @PostMapping("/clear-session")
+  /*  @PostMapping("/clear-session")
     @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<?> clearSession() {
         authService.clearSession();
@@ -202,7 +202,7 @@ public class AuthController {
 
     // Records para request e response
     private record SessionInfo(String idLogin, String token, Object userData) {}
-}
+}*/
 
 /*
 
@@ -361,3 +361,224 @@ public class AuthController {
     private record CookiesRequest(String cookies) {}
     private record SessionInfo(String idLogin, String token, Object userData) {}
 }*/
+
+package com.autoshopping.stock_control.api.session;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Comparator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/auth")
+@CrossOrigin(
+        origins = {"http://localhost:3001", "http://localhost:5173"},
+        allowCredentials = "false",
+        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS}
+)
+public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+
+    private final AuthService authService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestTemplate restTemplate;
+
+    @Value("${app.consultas.url}")
+    private String consultasUrl;
+
+    @Value("${app.pendencias.url}")
+    private String pendenciasUrl;
+
+    @Value("${app.cookies-session.uri}")
+    private String cookiesSessionUri;
+
+    /**
+     * Endpoint para inicializar a sessão lendo o arquivo de sessão serializado
+     */
+    @GetMapping("/initialize-session")
+    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    public ResponseEntity<?> initializeSession() {
+        String userIdStr;
+        try {
+            userIdStr = extractUserIdFromSerializedSession();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(400).body(e.getMessage());
+        }
+
+        if (userIdStr == null || userIdStr.trim().isEmpty()) {
+            return ResponseEntity.status(400).body("Não foi possível extrair o ID do usuário do arquivo de sessão.");
+        }
+
+        try {
+            Long userId = Long.parseLong(userIdStr.trim());
+            JsonNode userData = authService.fetchUserData(userId);
+
+            if (userData == null) {
+                return ResponseEntity.status(401).body("Falha ao carregar dados do usuário com ID: " + userId);
+            }
+
+            authService.setSessionFromUserId(userId, userData);
+
+            return ResponseEntity.ok(new SessionInfo(
+                    userId.toString(),
+                    userId.toString(),
+                    userData
+            ));
+
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(400).body("ID do usuário inválido no arquivo de sessão: " + userIdStr);
+        }
+    }
+
+    /**
+     * Extrai o ID do usuário da serialização PHP em arquivos sess_*.txt
+     */
+    private String extractUserIdFromSerializedSession() {
+        try {
+            Path cookiesDir = Paths.get(cookiesSessionUri);
+            if (!Files.exists(cookiesDir) || !Files.isDirectory(cookiesDir)) {
+                throw new RuntimeException("Diretório de cookies não encontrado: " + cookiesSessionUri);
+            }
+
+            Path sessionFile = Files.list(cookiesDir)
+                    .filter(path -> {
+                        String fileName = path.getFileName().toString();
+                        return fileName.startsWith("sess_") && fileName.endsWith(".txt");
+                    })
+                    .filter(path -> {
+                        try {
+                            return Files.size(path) > 0;
+                        } catch (IOException e) {
+                            return false;
+                        }
+                    })
+                    .max(Comparator.comparingLong(path -> {
+                        try {
+                            return Files.getLastModifiedTime(path).toMillis();
+                        } catch (IOException e) {
+                            return 0L;
+                        }
+                    }))
+                    .orElseThrow(() -> new RuntimeException("Nenhum arquivo sess_*.txt com dados encontrado em: " + cookiesDir));
+
+            String content = Files.readString(sessionFile).trim();
+
+            // Regex para capturar o valor do campo "id"
+            Pattern pattern = Pattern.compile("s:\\d+:\"id\";\\s*s:(\\d+):\"([^\"]+)\"");
+            Matcher matcher = pattern.matcher(content);
+
+            if (matcher.find()) {
+                String idValue = matcher.group(2);
+                log.info("ID do usuário extraído do arquivo {}: {}", sessionFile, idValue);
+                return idValue;
+            } else {
+                throw new RuntimeException("Campo 'id' não encontrado na serialização do arquivo: " + sessionFile);
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("Erro ao ler arquivo de sessão: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Endpoint para obter informações da sessão atual
+     */
+    @GetMapping("/session-info")
+    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    public ResponseEntity<?> getSessionInfo() {
+        if (!authService.isSessionValid()) {
+            return ResponseEntity.status(401).body("Sessão inválida ou não inicializada");
+        }
+
+        JsonNode userData = authService.getCurrentUserData();
+        Long idLogin = authService.getCurrentIdLogin();
+
+        SessionInfo sessionInfo = new SessionInfo(
+                idLogin != null ? idLogin.toString() : null,
+                idLogin != null ? idLogin.toString() : null,
+                userData
+        );
+
+        return ResponseEntity.ok(sessionInfo);
+    }
+
+    /**
+     * Endpoint para obter consultas — agora sem depender de cookies reais
+     */
+    @PostMapping("/consultas")
+    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    public ResponseEntity<?> obterConsultas() {
+        if (!authService.isSessionValid()) {
+            return ResponseEntity.status(401).body("Sessão inválida");
+        }
+
+        // Se ainda precisar de cookies reais, ajuste aqui. Por enquanto, chamamos sem.
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = restTemplate.exchange(consultasUrl, HttpMethod.POST, entity, String.class);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            try {
+                return ResponseEntity.ok(objectMapper.readTree(response.getBody()));
+            } catch (Exception e) {
+                return ResponseEntity.ok(response.getBody());
+            }
+        }
+
+        return ResponseEntity.status(response.getStatusCode())
+                .body("Erro ao obter consultas");
+    }
+
+    /**
+     * Endpoint para obter pendências — agora sem depender de cookies reais
+     */
+    @PostMapping("/pendencias")
+    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    public ResponseEntity<?> obterPendencias() {
+        if (!authService.isSessionValid()) {
+            return ResponseEntity.status(401).body("Sessão inválida");
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+        HttpEntity<?> entity = new HttpEntity<>(headers);
+        ResponseEntity<Object> response = restTemplate.exchange(pendenciasUrl, HttpMethod.POST, entity, Object.class);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            return ResponseEntity.ok(response.getBody());
+        }
+
+        return ResponseEntity.status(response.getStatusCode())
+                .body("Erro ao obter pendências");
+    }
+
+    /**
+     * Limpa a sessão
+     */
+    @PostMapping("/clear-session")
+    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    public ResponseEntity<?> clearSession() {
+        authService.clearSession();
+        return ResponseEntity.ok("Sessão limpa com sucesso");
+    }
+
+    private record SessionInfo(String idLogin, String token, Object userData) {}
+}

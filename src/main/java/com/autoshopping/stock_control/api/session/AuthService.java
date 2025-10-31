@@ -1,4 +1,4 @@
-package com.autoshopping.stock_control.api.session;
+/*package com.autoshopping.stock_control.api.session;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,7 +40,7 @@ public class AuthService {
     /**
      * Define os cookies de sessão recebidos do front-end e inicializa a sessão
      */
-    public boolean initializeSessionWithCookies(String cookies) {
+   /* public boolean initializeSessionWithCookies(String cookies) {
         try {
             if (cookies == null || cookies.trim().isEmpty()) {
                 log.error("Cookies de sessão vazios ou nulos");
@@ -76,7 +76,7 @@ public class AuthService {
      * Obtém o ID numérico do login.
      * Observação: nesse sistema, o campo "token" na resposta da API é na verdade o id_login (número).
      */
-    private Long fetchLoginId(String cookies) {
+   /* private Long fetchLoginId(String cookies) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set(HttpHeaders.COOKIE, cookies);
@@ -118,7 +118,7 @@ public class AuthService {
     /**
      * Busca os dados completos do usuário usando o loginId
      */
-    private JsonNode fetchUserData(Long loginId) {
+    /*private JsonNode fetchUserData(Long loginId) {
         try {
             String url = userDataUrl + loginId;
             log.info("Buscando dados do usuário em: {}", url);
@@ -151,15 +151,112 @@ public class AuthService {
     /**
      * Verifica se a sessão está válida
      */
-    public boolean isSessionValid() {
+   /* public boolean isSessionValid() {
         return currentUserData != null && sessionCookies != null;
     }
 
     /**
      * Limpa a sessão atual
      */
-    public void clearSession() {
+    /*public void clearSession() {
         this.sessionCookies = null;
+        this.currentIdLogin = null;
+        this.currentUserData = null;
+        log.info("Sessão limpa");
+    }
+}*/
+
+package com.autoshopping.stock_control.api.session;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import static org.springframework.util.StringUtils.truncate;
+
+@Getter
+@Service
+@Slf4j
+public class AuthService {
+
+    @Value("${app.userdata.url}")
+    private String userDataUrl;
+
+    @Value("${app.external.hash}")
+    private String externalHash;
+
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Getter
+    private String sessionCookies = ""; // mantido para compatibilidade, mas não usado
+
+    @Getter
+    private Long currentIdLogin;
+
+    @Getter
+    private JsonNode currentUserData;
+
+    /**
+     * Define a sessão com base no ID do usuário e seus dados
+     */
+    public void setSessionFromUserId(Long loginId, JsonNode userData) {
+        this.currentIdLogin = loginId;
+        this.currentUserData = userData;
+        // sessionCookies permanece vazio, pois não há cookies reais
+        log.info("Sessão local inicializada com ID: {}", loginId);
+    }
+
+    /**
+     * Busca os dados do usuário usando o loginId
+     */
+    public JsonNode fetchUserData(Long loginId) {
+        try {
+            String url = userDataUrl + loginId;
+            log.info("Buscando dados do usuário em: {}", url);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Hash", externalHash);
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+            log.info("Resposta recebida (resumo): {}", truncate(response.getBody(), 300));
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return objectMapper.readTree(response.getBody());
+            }
+
+            log.warn("Falha ao obter dados do usuário. Status: {}", response.getStatusCode());
+            return null;
+
+        } catch (Exception e) {
+            log.error("Erro ao obter dados do usuário: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Verifica se a sessão está válida
+     */
+    public boolean isSessionValid() {
+        return currentIdLogin != null && currentUserData != null;
+    }
+
+    /**
+     * Limpa a sessão atual
+     */
+    public void clearSession() {
+        this.sessionCookies = "";
         this.currentIdLogin = null;
         this.currentUserData = null;
         log.info("Sessão limpa");
