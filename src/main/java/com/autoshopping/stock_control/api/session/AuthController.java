@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Comparator;
 
 @RestController
 @RequiredArgsConstructor
@@ -72,14 +73,17 @@ public class AuthController {
                 throw new RuntimeException("Diretório de cookies não encontrado: " + cookiesSessionUri);
             }
 
-            // Supondo que o nome do arquivo de sessão seja fixo ou único
-            // Aqui você pode adaptar para buscar o nome correto do arquivo
-            // Exemplo: o arquivo se chama "session_cookies.txt"
-            Path cookieFile = cookiesDir.resolve("session_cookies.txt");
-
-            if (!Files.exists(cookieFile)) {
-                throw new RuntimeException("Arquivo de cookies não encontrado: " + cookieFile);
-            }
+            // Busca o arquivo .txt mais recente no diretório
+            Path cookieFile = Files.list(cookiesDir)
+                    .filter(path -> path.toString().endsWith(".txt"))
+                    .max(Comparator.comparingLong(path -> {
+                        try {
+                            return Files.getLastModifiedTime(path).toMillis();
+                        } catch (IOException e) {
+                            return 0L;
+                        }
+                    }))
+                    .orElseThrow(() -> new RuntimeException("Nenhum arquivo .txt encontrado em: " + cookiesDir));
 
             byte[] content = Files.readAllBytes(cookieFile);
             return new String(content).trim();
