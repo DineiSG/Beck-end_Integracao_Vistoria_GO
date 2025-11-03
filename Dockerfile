@@ -16,6 +16,11 @@ RUN ls -la /app/target/
 
 # --- Estágio Final ---
 FROM eclipse-temurin:17-jre
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends mariadb-client && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copia o JAR gerado
@@ -23,3 +28,4 @@ COPY --from=build /app/target/stock_control-2.2.0.jar /app/stock_control-2.2.0.j
 
 EXPOSE 8090
 ENTRYPOINT [ "java", "-jar", "/app/stock_control-2.2.0.jar" ]
+
