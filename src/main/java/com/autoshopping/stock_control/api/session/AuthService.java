@@ -187,6 +187,9 @@ import static org.springframework.util.StringUtils.truncate;
 @Slf4j
 public class AuthService {
 
+    @Value("${app.token.url}")
+    private String tokenUrl;
+
     @Value("${app.userdata.url}")
     private String userDataUrl;
 
@@ -196,27 +199,62 @@ public class AuthService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Getter
-    private String sessionCookies = ""; // mantido para compatibilidade, mas não usado
-
-    @Getter
+    // Estado da sessão
+    private String sessionCookies;
     private Long currentIdLogin;
-
-    @Getter
     private JsonNode currentUserData;
 
     /**
-     * Define a sessão com base no ID do usuário e seus dados
+     * Valida o ID do usuário com o backend PHP e obtém o "token" (que é o próprio ID validado)
      */
-    public void setSessionFromUserId(Long loginId, JsonNode userData) {
-        this.currentIdLogin = loginId;
-        this.currentUserData = userData;
-        // sessionCookies permanece vazio, pois não há cookies reais
-        log.info("Sessão local inicializada com ID: {}", loginId);
+    public Long fetchLoginId(String simulatedCookies, Long expectedId) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(HttpHeaders.COOKIE, simulatedCookies);
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    tokenUrl,
+                    HttpMethod.GET,
+                    entity,
+                    String.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                log.info("Resposta do endpoint de token: {}", response.getBody());
+
+                JsonNode json = objectMapper.readTree(response.getBody());
+                if (json.has("dados") && json.get("dados").has("token")) {
+                    String tokenStr = json.get("dados").get("token").asText().trim();
+                    try {
+                        Long token = Long.parseLong(tokenStr);
+                        // Opcional: validar se o token retornado corresponde ao esperado
+                        if (!token.equals(expectedId)) {
+                            log.warn("Token retornado ({}) não corresponde ao ID esperado ({})", token, expectedId);
+                        }
+                        return token;
+                    } catch (NumberFormatException e) {
+                        log.error("Valor de 'token' não é um número válido: {}", tokenStr);
+                        return null;
+                    }
+                } else {
+                    log.warn("Campo 'dados.token' não encontrado na resposta do tokenUrl");
+                    return null;
+                }
+            } else {
+                log.error("Falha na chamada ao tokenUrl. Status: {}", response.getStatusCode());
+                return null;
+            }
+        } catch (Exception e) {
+            log.error("Erro ao obter/validar token com backend PHP: {}", e.getMessage(), e);
+            return null;
+        }
     }
 
     /**
-     * Busca os dados do usuário usando o loginId
+     * Busca os dados completos do usuário usando o token (ID validado)
      */
     public JsonNode fetchUserData(Long loginId) {
         try {
@@ -228,6 +266,7 @@ public class AuthService {
             headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
+
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
             log.info("Resposta recebida (resumo): {}", truncate(response.getBody(), 300));
@@ -240,25 +279,35 @@ public class AuthService {
             return null;
 
         } catch (Exception e) {
-            log.error("Erro ao obter dados do usuário: {}", e.getMessage(), e);
+            log.error("Erro ao obter dados do usuário {}: {}", loginId, e.getMessage(), e);
             return null;
         }
+    }
+
+    /**
+     * Define a sessão com base no ID validado, cookies simulados e dados do usuário
+     */
+    public void setSession(Long id, String cookies, JsonNode userData) {
+        this.currentIdLogin = id;
+        this.sessionCookies = cookies;
+        this.currentUserData = userData;
+        log.info("Sessão armazenada com ID: {}", id);
     }
 
     /**
      * Verifica se a sessão está válida
      */
     public boolean isSessionValid() {
-        return currentIdLogin != null && currentUserData != null;
+        return currentIdLogin != null && currentUserData != null && sessionCookies != null;
     }
 
     /**
      * Limpa a sessão atual
      */
     public void clearSession() {
-        this.sessionCookies = "";
+        this.sessionCookies = null;
         this.currentIdLogin = null;
         this.currentUserData = null;
-        log.info("Sessão limpa");
+        log.info("🧹 Sessão limpa com sucesso");
     }
 }
