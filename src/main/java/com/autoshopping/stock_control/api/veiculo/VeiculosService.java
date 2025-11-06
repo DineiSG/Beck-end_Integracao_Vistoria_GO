@@ -17,7 +17,6 @@ public class VeiculosService {
 
     private static final Logger logger = LoggerFactory.getLogger(VeiculosService.class);
 
-
     private Iterable<Veiculos> optional;
     private Integer id_unidade;
 
@@ -25,11 +24,11 @@ public class VeiculosService {
         return rep.findAll();
     }
 
-    public Iterable<Veiculos> getVeiculosByUnidade(String unidade) {
+    public Optional<Veiculos> getVeiculosByUnidade(String unidade) {
         return rep.findByUnidade(unidade);
     }
 
-    public Iterable<Veiculos> getVeiculosByModelo(String modelo) {
+    public Optional<Veiculos> getVeiculosByModelo(String modelo) {
         return rep.findByModelo(modelo);
     }
 

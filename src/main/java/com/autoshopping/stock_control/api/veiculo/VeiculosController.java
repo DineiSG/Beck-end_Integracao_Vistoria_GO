@@ -131,12 +131,12 @@ public class VeiculosController {
 
 
     @GetMapping("/unidade/{unidade}")
-    public Iterable<Veiculos>getVeiculosByUnidade(@PathVariable("unidade")String unidade){
+    public Optional<Veiculos>getVeiculosByUnidade(@PathVariable("unidade")String unidade){
         return service.getVeiculosByUnidade(unidade);
     }
 
     @GetMapping("/modelo/{modelo}")
-    public Iterable<Veiculos>getVeiculosByModelo(@PathVariable("modelo")String modelo){
+    public Optional<Veiculos>getVeiculosByModelo(@PathVariable("modelo")String modelo){
         return service.getVeiculosByModelo(modelo);
     }
 

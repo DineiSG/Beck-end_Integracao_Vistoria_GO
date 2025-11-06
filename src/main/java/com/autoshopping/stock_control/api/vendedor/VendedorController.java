@@ -30,7 +30,7 @@ public class VendedorController {
 
     @GetMapping("/nome/{nome}")
     public Optional<Vendedor> getVendedorByNome(@PathVariable("nome") String nome){
-        logger.info("Consulta ao cadastro do vendedor "+nome,"realizada.");
+        logger.info("Consulta ao cadastro do vendedor {}", nome, "realizada.");
         return service.getVendedorByNome(nome);
     }
 
@@ -52,7 +52,7 @@ public class VendedorController {
     @PostMapping
     public ResponseEntity post(@RequestBody Vendedor vendedor){
         Vendedor novo =service.insert(vendedor);
-        logger.info("Foi realizada um novo cadastro de vendedor: "+vendedor);
+        logger.info("Foi realizada um novo cadastro de vendedor: {}", vendedor);
         return ResponseEntity.ok("Vendedor cadastrado com sucesso.");
     }
 

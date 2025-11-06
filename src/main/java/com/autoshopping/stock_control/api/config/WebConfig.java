@@ -21,6 +21,8 @@ public class WebConfig implements WebMvcConfigurer {
 
         // Permite origens específicas (adicione suas URLs)
         config.setAllowedOrigins(Arrays.asList(
+                "https://ambteste.credtudo.com.br",
+                "https://credtudo.com.br",
                 "http://177.70.23.73:5173",
                 "http://localhost:3000",
                 "http://localhost:5173",

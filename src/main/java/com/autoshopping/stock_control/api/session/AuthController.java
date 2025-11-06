@@ -203,10 +203,7 @@ public class AuthController {
     // Records para request e response
     private record SessionInfo(String idLogin, String token, Object userData) {}
 }*/
-
-/*
-
-Código antigo:
+package com.autoshopping.stock_control.api.session;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -220,7 +217,7 @@ import org.springframework.web.client.RestTemplate;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/auth")
 @CrossOrigin(
-        origins = {"http://localhost:3001", "http://localhost:5173"},
+        origins = {"http://localhost:3001", "http://localhost:5173", "http://177.70.23.73:5173", "https://ambteste.credtudo.com.br/", "https://credtudo.com.br" },
         allowCredentials = "false",
         methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS}
 )
@@ -236,38 +233,29 @@ public class AuthController {
     @Value("${app.pendencias.url}")
     private String pendenciasUrl;
 
-    /**
-     * Endpoint para receber os cookies de sessão do front-end e inicializar a sessão
-     */
-    /*@PostMapping("/initialize-session")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
-    public ResponseEntity<?> initializeSession(@RequestBody CookiesRequest cookiesRequest) {
-        if (cookiesRequest.cookies() == null || cookiesRequest.cookies().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Cookies de sessão não fornecidos");
+    @PostMapping("/initialize-session")
+    public ResponseEntity<?> initializeSession(@RequestBody TokenRequest tokenRequest) {
+        if (tokenRequest.token() == null || tokenRequest.token().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Token não fornecido");
         }
 
-        boolean success = authService.initializeSessionWithCookies(cookiesRequest.cookies());
+        boolean success = authService.initializeSessionWithToken(tokenRequest.token());
 
         if (success) {
             return ResponseEntity.ok(new SessionInfo(
                     authService.getCurrentIdLogin().toString(),
-                    authService.getCurrentIdLogin().toString(),
+                    tokenRequest.token(),
                     authService.getCurrentUserData()
             ));
         }
 
-        return ResponseEntity.status(401).body("Falha ao inicializar sessão com os cookies fornecidos");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Falha ao inicializar sessão com o token fornecido");
     }
 
-    /**
-     * Endpoint para o front-end obter as informações da sessão atual
-     * Retorna os dados do usuário em formato JSON
-     */
-    /*@GetMapping("/session-info")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    @GetMapping("/session-info")
     public ResponseEntity<?> getSessionInfo() {
         if (!authService.isSessionValid()) {
-            return ResponseEntity.status(401).body("Sessão inválida ou não inicializada");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão inválida ou não inicializada");
         }
 
         JsonNode userData = authService.getCurrentUserData();
@@ -275,26 +263,22 @@ public class AuthController {
 
         SessionInfo sessionInfo = new SessionInfo(
                 idLogin != null ? idLogin.toString() : null,
-                idLogin != null ? idLogin.toString() : null,
+                authService.getCurrentToken(),
                 userData
         );
 
         return ResponseEntity.ok(sessionInfo);
     }
 
-    /**
-     * Endpoint para obter consultas usando a sessão ativa
-     */
-    /*@PostMapping("/consultas")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    @PostMapping("/consultas")
     public ResponseEntity<?> obterConsultas() {
         if (!authService.isSessionValid()) {
-            return ResponseEntity.status(401).body("Sessão inválida");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão inválida");
         }
 
         String cookies = authService.getSessionCookies();
         if (cookies == null || cookies.isEmpty()) {
-            return ResponseEntity.status(401).body("Cookies de sessão não disponíveis");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Cookies de sessão não disponíveis");
         }
 
         HttpHeaders headers = new HttpHeaders();
@@ -317,19 +301,15 @@ public class AuthController {
                 .body("Erro ao obter consultas");
     }
 
-    /**
-     * Endpoint para obter pendências usando a sessão ativa
-     */
-    /*@PostMapping("/pendencias")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    @PostMapping("/pendencias")
     public ResponseEntity<?> obterPendencias() {
         if (!authService.isSessionValid()) {
-            return ResponseEntity.status(401).body("Sessão inválida");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão inválida");
         }
 
         String cookies = authService.getSessionCookies();
         if (cookies == null || cookies.isEmpty()) {
-            return ResponseEntity.status(401).body("Cookies de sessão não disponíveis");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Cookies de sessão não disponíveis");
         }
 
         HttpHeaders headers = new HttpHeaders();
@@ -347,21 +327,17 @@ public class AuthController {
                 .body("Erro ao obter pendências");
     }
 
-    /**
-     * Endpoint para limpar a sessão atual
-     */
-    /*@PostMapping("/clear-session")
-    @CrossOrigin(origins = "*", allowedHeaders = "*")
+    @PostMapping("/clear-session")
     public ResponseEntity<?> clearSession() {
         authService.clearSession();
         return ResponseEntity.ok("Sessão limpa com sucesso");
     }
 
-    // Records para request e response
-    private record CookiesRequest(String cookies) {}
+    private record TokenRequest(String token) {}
     private record SessionInfo(String idLogin, String token, Object userData) {}
-}*/
+}
 
+/*
 package com.autoshopping.stock_control.api.session;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -374,12 +350,10 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Comparator;
 import java.util.Map;
 
 
@@ -411,9 +385,11 @@ public class AuthController {
     @Value("${app.cookies-session.uri}")
     private String cookiesSessionUri; // Ex: E:/Projetos/Integracao_VistoriaGO
 
-    /**
+    */
+/**
      * Inicializa a sessão: lê o arquivo .txt, extrai o ID, obtém token e dados do usuário
-     */
+     *//*
+
     @GetMapping("/initialize-session")
     @CrossOrigin(origins = "*", allowedHeaders = "*")
     public ResponseEntity<?> initializeSession() {
@@ -534,4 +510,4 @@ public class AuthController {
     }
 
     private record SessionInfo(String idLogin, String token, Object userData) {}
-}
+}*/
