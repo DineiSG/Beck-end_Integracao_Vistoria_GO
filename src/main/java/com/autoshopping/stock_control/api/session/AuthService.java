@@ -29,7 +29,7 @@ public class AuthService {
     private String sessionCookies;
 
     @Getter
-    private Long currentIdLogin;
+    private Long currentIdLogin; // ainda pode ser preenchido se existir, mas não é obrigatório
 
     @Getter
     private JsonNode currentUserData;
@@ -59,17 +59,9 @@ public class AuthService {
             try {
                 jsonNode = objectMapper.readTree(responseBody);
             } catch (Exception e) {
-                log.warn("Resposta não está em JSON. Tentando converter...");
-                // Se não for JSON, envolvemos como { "raw": "..." }
+                log.warn("Resposta não está em JSON. Convertendo para estrutura padrão.");
                 jsonNode = objectMapper.createObjectNode()
                         .put("raw_response", responseBody);
-            }
-
-            // Extrai id_login opcionalmente para validação futura
-            if (jsonNode.has("id_login")) {
-                // ok, tem id_login
-            } else {
-                log.warn("Resposta do userdata não contém 'id_login'");
             }
 
             return jsonNode;
@@ -83,10 +75,26 @@ public class AuthService {
     public void setCurrentSession(String token, JsonNode userData) {
         this.currentToken = token;
         this.currentUserData = userData;
-        this.currentIdLogin = userData.has("id_login") ? userData.get("id_login").asLong() : null;
-        this.sessionCookies = userData.has("cookies") ? userData.get("cookies").asText() : null;
+
+        // Apenas define currentIdLogin se o campo existir — mas não exige
+        if (userData != null && userData.has("id_login")) {
+            try {
+                this.currentIdLogin = userData.get("id_login").asLong();
+            } catch (Exception e) {
+                log.warn("Campo 'id_login' presente, mas não é um número válido.");
+                this.currentIdLogin = null;
+            }
+        } else {
+            this.currentIdLogin = null;
+        }
+
+        // Tenta extrair cookies, se existirem
+        this.sessionCookies = (userData != null && userData.has("cookies"))
+                ? userData.get("cookies").asText()
+                : null;
     }
 
+    // ✅ Sessão é válida se houver token e dados do usuário — NÃO exige id_login
     public boolean isSessionValid() {
         return currentToken != null && currentUserData != null;
     }

@@ -63,7 +63,7 @@ public class AuthController {
         Long idLogin = authService.getCurrentIdLogin();
 
         SessionInfo sessionInfo = new SessionInfo(
-                idLogin != null ? idLogin.toString() : null,
+                idLogin != null ? idLogin.toString() : null, // pode ser null
                 authService.getCurrentToken(),
                 userData
         );
