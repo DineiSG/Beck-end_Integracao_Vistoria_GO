@@ -39,17 +39,18 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Token não fornecido");
         }
 
-        boolean success = authService.initializeSessionWithToken(tokenRequest.token());
-
-        if (success) {
-            return ResponseEntity.ok(new SessionInfo(
-                    authService.getCurrentIdLogin().toString(),
-                    tokenRequest.token(),
-                    authService.getCurrentUserData()
-            ));
+        JsonNode userData = authService.fetchUserData(tokenRequest.token());
+        if (userData == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Falha ao buscar dados do usuário com o token fornecido");
         }
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Falha ao inicializar sessão com o token fornecido");
+        authService.setCurrentSession(tokenRequest.token(), userData);
+
+        return ResponseEntity.ok(new SessionInfo(
+                authService.getCurrentIdLogin().toString(),
+                tokenRequest.token(),
+                userData
+        ));
     }
 
     @GetMapping("/session-info")

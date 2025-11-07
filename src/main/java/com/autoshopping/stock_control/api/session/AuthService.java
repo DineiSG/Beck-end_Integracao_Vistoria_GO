@@ -5,19 +5,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 @Service
 @Slf4j
 public class AuthService {
 
-    // Removido @Value("${app.token.url}")
     @Value("${app.userdata.url}")
-    private String userdataUrl;
+    private String userDataUrl;
 
     @Value("${app.external.hash}")
     private String externalHash;
@@ -37,79 +37,58 @@ public class AuthService {
     @Getter
     private String currentToken;
 
-    public boolean initializeSessionWithToken(String token) {
+    public JsonNode fetchUserData(String token) {
         try {
-            if (token == null || token.trim().isEmpty()) {
-                log.error("Token vazio ou nulo");
-                return false;
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Token", token);
+            headers.set("Hash", externalHash);
+            headers.set("Accept", "application/json");
+
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(userDataUrl, HttpMethod.GET, request, String.class);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                log.warn("Resposta inválida do endpoint de userdata. Status: {}", response.getStatusCode());
+                return null;
             }
 
-            this.currentToken = token;
+            String responseBody = response.getBody().trim();
+            JsonNode jsonNode;
 
-            JsonNode userInfo = fetchUserInfoFromExternal(token);
-            if (userInfo == null) {
-                return false;
+            try {
+                jsonNode = objectMapper.readTree(responseBody);
+            } catch (Exception e) {
+                log.warn("Resposta não está em JSON. Tentando converter...");
+                // Se não for JSON, envolvemos como { "raw": "..." }
+                jsonNode = objectMapper.createObjectNode()
+                        .put("raw_response", responseBody);
             }
 
-            if (!userInfo.has("id_login")) {
-                log.error("Resposta do endpoint userdata não contém 'id_login'");
-                return false;
+            // Extrai id_login opcionalmente para validação futura
+            if (jsonNode.has("id_login")) {
+                // ok, tem id_login
+            } else {
+                log.warn("Resposta do userdata não contém 'id_login'");
             }
 
-            Long idLogin = userInfo.get("id_login").asLong();
-            String cookies = userInfo.has("cookies") ? userInfo.get("cookies").asText() : null;
-
-            this.currentIdLogin = idLogin;
-            this.sessionCookies = cookies;
-            this.currentUserData = userInfo;
-
-            log.info("Sessão inicializada com sucesso para id_login: {}", idLogin);
-            return true;
+            return jsonNode;
 
         } catch (Exception e) {
-            log.error("Erro ao inicializar sessão com token: {}", e.getMessage(), e);
-            return false;
+            log.error("Erro ao buscar dados do usuário no endpoint {}: {}", userDataUrl, e.getMessage(), e);
+            return null;
         }
     }
 
-    private JsonNode fetchUserInfoFromExternal(String token) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-            headers.set("Hash", externalHash);
-
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("token", token);
-
-            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
-
-            ResponseEntity<String> response = restTemplate.postForEntity(userdataUrl, request, String.class);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                String responseBody = response.getBody().trim();
-                log.info("Resposta do endpoint userdata: {}", responseBody);
-
-                // Tenta interpretar como JSON. Se falhar, converte conteúdo bruto em JSON (ex: { "raw": "..." })
-                try {
-                    return objectMapper.readTree(responseBody);
-                } catch (Exception jsonEx) {
-                    log.warn("Resposta não é JSON válido, encapsulando como objeto JSON.");
-                    return objectMapper.createObjectNode()
-                            .put("raw_response", responseBody);
-                }
-            }
-
-            log.warn("Resposta inválida do endpoint userdata. Status: {}", response.getStatusCode());
-            return null;
-
-        } catch (Exception e) {
-            log.error("Erro ao comunicar com o endpoint userdata: {}", e.getMessage(), e);
-            return null;
-        }
+    public void setCurrentSession(String token, JsonNode userData) {
+        this.currentToken = token;
+        this.currentUserData = userData;
+        this.currentIdLogin = userData.has("id_login") ? userData.get("id_login").asLong() : null;
+        this.sessionCookies = userData.has("cookies") ? userData.get("cookies").asText() : null;
     }
 
     public boolean isSessionValid() {
-        return currentToken != null && currentIdLogin != null;
+        return currentToken != null && currentUserData != null;
     }
 
     public void clearSession() {
@@ -119,7 +98,4 @@ public class AuthService {
         this.currentUserData = null;
         log.info("Sessão limpa");
     }
-
-
-
 }
