@@ -15,8 +15,9 @@ import org.springframework.web.client.RestTemplate;
 @Slf4j
 public class AuthService {
 
-    @Value("${app.token.url}")
-    private String tokenUrl;
+    // Removido @Value("${app.token.url}")
+    @Value("${app.userdata.url}")
+    private String userdataUrl;
 
     @Value("${app.external.hash}")
     private String externalHash;
@@ -45,13 +46,13 @@ public class AuthService {
 
             this.currentToken = token;
 
-            JsonNode userInfo = fetchUserInfoFromPhp(token);
+            JsonNode userInfo = fetchUserInfoFromExternal(token);
             if (userInfo == null) {
                 return false;
             }
 
             if (!userInfo.has("id_login")) {
-                log.error("Resposta do backend PHP não contém 'id_login'");
+                log.error("Resposta do endpoint userdata não contém 'id_login'");
                 return false;
             }
 
@@ -71,7 +72,7 @@ public class AuthService {
         }
     }
 
-    private JsonNode fetchUserInfoFromPhp(String token) {
+    private JsonNode fetchUserInfoFromExternal(String token) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -82,18 +83,27 @@ public class AuthService {
 
             HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
-            ResponseEntity<String> response = restTemplate.postForEntity(tokenUrl, request, String.class);
+            ResponseEntity<String> response = restTemplate.postForEntity(userdataUrl, request, String.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                log.info("Resposta do backend PHP: {}", response.getBody());
-                return objectMapper.readTree(response.getBody());
+                String responseBody = response.getBody().trim();
+                log.info("Resposta do endpoint userdata: {}", responseBody);
+
+                // Tenta interpretar como JSON. Se falhar, converte conteúdo bruto em JSON (ex: { "raw": "..." })
+                try {
+                    return objectMapper.readTree(responseBody);
+                } catch (Exception jsonEx) {
+                    log.warn("Resposta não é JSON válido, encapsulando como objeto JSON.");
+                    return objectMapper.createObjectNode()
+                            .put("raw_response", responseBody);
+                }
             }
 
-            log.warn("Resposta inválida do backend PHP. Status: {}", response.getStatusCode());
+            log.warn("Resposta inválida do endpoint userdata. Status: {}", response.getStatusCode());
             return null;
 
         } catch (Exception e) {
-            log.error("Erro ao comunicar com o backend PHP: {}", e.getMessage(), e);
+            log.error("Erro ao comunicar com o endpoint userdata: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -110,4 +120,3 @@ public class AuthService {
         log.info("Sessão limpa");
     }
 }
-

@@ -12,7 +12,12 @@ import org.springframework.web.client.RestTemplate;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/auth")
 @CrossOrigin(
-        origins = {"http://localhost:3001", "http://localhost:5173", "http://177.70.23.73:5173", "https://ambteste.credtudo.com.br/", "https://credtudo.com.br" },
+        origins = {
+                "http://localhost:3001",
+                "http://localhost:5173",
+                "http://177.70.23.73:5173",
+                "https://ambteste.credtudo.com.br",
+                "https://credtudo.com.br"},
         allowCredentials = "false",
         methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS}
 )
