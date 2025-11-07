@@ -119,4 +119,7 @@ public class AuthService {
         this.currentUserData = null;
         log.info("Sessão limpa");
     }
+
+
+
 }
