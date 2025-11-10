@@ -14,5 +14,5 @@ public interface VendasLojaRepository extends JpaRepository<Vendas, Integer> {
 
     Optional<Vendas> findByPlacaAndUnidade(String placa, String unidade);
 
-    Optional<Vendas> findByIdAndUnidade(Integer id, String unidade);
+    void deleteByPlaca(String placa);
 }

@@ -44,14 +44,14 @@ public class VendasController {
 
     @GetMapping("/vendedor/{vendedor}")
     public Optional<Vendas> getVendasByVendedor(@PathVariable("vendedor") String vendedor){
-        logger.info("Consulta às vendas realizadas pelo vendedor "+vendedor," realizada");
+        logger.info("Consulta às vendas realizadas pelo vendedor {}", vendedor, " realizada");
         return service.getVendasByVendedor(vendedor);
     }
 
     @PostMapping
     public ResponseEntity post (@RequestBody Vendas venda){
         Vendas nova=service.insert(venda);
-        logger.info("Foi realizada uma nova comunicação de venda: "+venda);
+        logger.info("Foi realizada uma nova comunicação de venda: {}", venda);
         return ResponseEntity.ok("Venda comunicada com sucesso.");
     }
 
@@ -66,9 +66,9 @@ public class VendasController {
 
 
 
-    @DeleteMapping("{id}")
-    public ResponseEntity delete (@PathVariable("id") Integer id){
-        boolean ok=service.delete(id);
+    @DeleteMapping("/placa/{placa}")
+    public ResponseEntity delete (@PathVariable("placa") String placa){
+        boolean ok=service.delete(placa);
         return ok?
                 ResponseEntity.ok("Registro deletado com successo"):
                 ResponseEntity.notFound().build();

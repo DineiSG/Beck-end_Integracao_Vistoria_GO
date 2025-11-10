@@ -37,9 +37,9 @@ public class VendasService {
         }
     }
 
-    public boolean delete(Integer id) {
-        if(getVendasById(id).isPresent()){
-            rep.deleteById(String.valueOf(id));
+    public boolean delete(String placa) {
+        if(getVendasByPlaca(placa).isPresent()){
+            rep.deleteByPlaca((placa));
             return true;
         }
         return false;

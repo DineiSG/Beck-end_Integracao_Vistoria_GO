@@ -38,10 +38,10 @@ public class VendasLojaService {
         throw new RuntimeException("Venda não encontrada para atualização na loja " + loja);
     }
 
-    public boolean deleteVendaByLoja(Integer id, String loja) {
-        Optional<Vendas> venda = repository.findByIdAndUnidade(id, loja);
+    public boolean deleteVendaByLoja(String placa, String loja) {
+        Optional<Vendas> venda = repository.findByPlacaAndUnidade(placa, loja);
         if (venda.isPresent()) {
-            repository.deleteById(id);
+            repository.deleteByPlaca(placa);
             return true;
         }
         return false;

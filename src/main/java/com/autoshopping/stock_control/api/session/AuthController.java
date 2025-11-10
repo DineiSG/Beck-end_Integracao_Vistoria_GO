@@ -8,132 +8,127 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
-@RestController
-@RequiredArgsConstructor
-@RequestMapping("/api/v1/auth")
-@CrossOrigin(
-        origins = {
-                "http://localhost:3001",
-                "http://localhost:5173",
-                "http://177.70.23.73:5173",
-                "https://ambteste.credtudo.com.br",
-                "https://credtudo.com.br"},
-        allowCredentials = "false",
-        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS}
-)
-public class AuthController {
+    @RestController
+    @RequiredArgsConstructor
+    @RequestMapping("/api/v1/auth")
+    @CrossOrigin(
+            origins = {
+                    "http://localhost:3001",
+                    "http://localhost:5173",
+                    "http://177.70.23.73:5173",
+                    "https://ambteste.credtudo.com.br",
+                    "https://credtudo.com.br"},
+            allowCredentials = "false",
+            methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS}
+    )
+    public class AuthController {
 
-    private final AuthService authService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final RestTemplate restTemplate;
+        private final AuthService authService;
+        private final ObjectMapper objectMapper = new ObjectMapper();
+        private final RestTemplate restTemplate;
 
-    @Value("${app.consultas.url}")
-    private String consultasUrl;
+        @Value("${app.consultas.url}")
+        private String consultasUrl;
 
-    @Value("${app.pendencias.url}")
-    private String pendenciasUrl;
+        @Value("${app.pendencias.url}")
+        private String pendenciasUrl;
 
-    @PostMapping("/initialize-session")
-    public ResponseEntity<?> initializeSession(@RequestBody TokenRequest tokenRequest) {
-        if (tokenRequest.token() == null || tokenRequest.token().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("Token não fornecido");
+        @PostMapping("/initialize-session")
+        public ResponseEntity<?> initializeSession(@RequestBody TokenRequest tokenRequest) {
+            if (tokenRequest.token() == null || tokenRequest.token().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Token não fornecido");
+            }
+
+            JsonNode userData = authService.fetchUserData(tokenRequest.token());
+            if (userData == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Falha ao buscar dados do usuário com o token fornecido");
+            }
+
+            authService.setCurrentSession(tokenRequest.token(), userData);
+
+            return ResponseEntity.ok(new SessionInfo(
+                    null, // idLogin não é necessário
+                    tokenRequest.token(),
+                    userData
+            ));
         }
 
-        JsonNode userData = authService.fetchUserData(tokenRequest.token());
-        if (userData == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Falha ao buscar dados do usuário com o token fornecido");
+        @GetMapping("/session-info")
+        public ResponseEntity<?> getSessionInfo() {
+            if (!authService.isSessionValid()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão inválida ou não inicializada");
+            }
+
+            SessionInfo sessionInfo = new SessionInfo(
+                    null,
+                    authService.getCurrentToken(),
+                    authService.getCurrentUserData()
+            );
+
+            return ResponseEntity.ok(sessionInfo);
         }
 
-        authService.setCurrentSession(tokenRequest.token(), userData);
+        @PostMapping("/consultas")
+        public ResponseEntity<?> obterConsultas() {
+            if (!authService.isSessionValid()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão inválida");
+            }
 
-        return ResponseEntity.ok(new SessionInfo(
-                authService.getCurrentIdLogin().toString(),
-                tokenRequest.token(),
-                userData
-        ));
-    }
+            String cookies = authService.getSessionCookies();
+            if (cookies == null || cookies.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Cookies de sessão não disponíveis");
+            }
 
-    @GetMapping("/session-info")
-    public ResponseEntity<?> getSessionInfo() {
-        if (!authService.isSessionValid()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão inválida ou não inicializada");
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(HttpHeaders.COOKIE, cookies);
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(consultasUrl, HttpMethod.POST, entity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                try {
+                    return ResponseEntity.ok(objectMapper.readTree(response.getBody()));
+                } catch (Exception e) {
+                    return ResponseEntity.ok(response.getBody());
+                }
+            }
+
+            return ResponseEntity.status(response.getStatusCode()).body("Erro ao obter consultas");
         }
 
-        JsonNode userData = authService.getCurrentUserData();
-        Long idLogin = authService.getCurrentIdLogin();
+        @PostMapping("/pendencias")
+        public ResponseEntity<?> obterPendencias() {
+            if (!authService.isSessionValid()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão inválida");
+            }
 
-        SessionInfo sessionInfo = new SessionInfo(
-                idLogin != null ? idLogin.toString() : null, // pode ser null
-                authService.getCurrentToken(),
-                userData
-        );
+            String cookies = authService.getSessionCookies();
+            if (cookies == null || cookies.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Cookies de sessão não disponíveis");
+            }
 
-        return ResponseEntity.ok(sessionInfo);
-    }
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(HttpHeaders.COOKIE, cookies);
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 
-    @PostMapping("/consultas")
-    public ResponseEntity<?> obterConsultas() {
-        if (!authService.isSessionValid()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão inválida");
-        }
+            HttpEntity<?> entity = new HttpEntity<>(headers);
+            ResponseEntity<Object> response = restTemplate.exchange(pendenciasUrl, HttpMethod.POST, entity, Object.class);
 
-        String cookies = authService.getSessionCookies();
-        if (cookies == null || cookies.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Cookies de sessão não disponíveis");
-        }
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set(HttpHeaders.COOKIE, cookies);
-        headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<String> response = restTemplate.exchange(consultasUrl, HttpMethod.POST, entity, String.class);
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            try {
-                return ResponseEntity.ok(objectMapper.readTree(response.getBody()));
-            } catch (Exception e) {
+            if (response.getStatusCode().is2xxSuccessful()) {
                 return ResponseEntity.ok(response.getBody());
             }
+
+            return ResponseEntity.status(response.getStatusCode()).body("Erro ao obter pendências");
         }
 
-        return ResponseEntity.status(response.getStatusCode())
-                .body("Erro ao obter consultas");
+        @PostMapping("/clear-session")
+        public ResponseEntity<?> clearSession() {
+            authService.clearSession();
+            return ResponseEntity.ok("Sessão limpa com sucesso");
+        }
+
+        private record TokenRequest(String token) {}
+        private record SessionInfo(String idLogin, String token, Object userData) {}
     }
-
-    @PostMapping("/pendencias")
-    public ResponseEntity<?> obterPendencias() {
-        if (!authService.isSessionValid()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão inválida");
-        }
-
-        String cookies = authService.getSessionCookies();
-        if (cookies == null || cookies.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Cookies de sessão não disponíveis");
-        }
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set(HttpHeaders.COOKIE, cookies);
-        headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-
-        HttpEntity<?> entity = new HttpEntity<>(headers);
-        ResponseEntity<Object> response = restTemplate.exchange(pendenciasUrl, HttpMethod.POST, entity, Object.class);
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            return ResponseEntity.ok(response.getBody());
-        }
-
-        return ResponseEntity.status(response.getStatusCode())
-                .body("Erro ao obter pendências");
-    }
-
-    @PostMapping("/clear-session")
-    public ResponseEntity<?> clearSession() {
-        authService.clearSession();
-        return ResponseEntity.ok("Sessão limpa com sucesso");
-    }
-
-    private record TokenRequest(String token) {}
-    private record SessionInfo(String idLogin, String token, Object userData) {}
-}

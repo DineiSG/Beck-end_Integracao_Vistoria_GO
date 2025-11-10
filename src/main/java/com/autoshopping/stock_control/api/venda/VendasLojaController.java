@@ -69,11 +69,11 @@ public class VendasLojaController {
     }
 
     // Deletar venda por ID na loja
-    @DeleteMapping("/{loja}/{id}")
+    @DeleteMapping("/{loja}/placa/{placa}")
     public ResponseEntity<Map<String, String>> deleteVendaByLoja(
             @PathVariable String loja,
-            @PathVariable Integer id) {
-        boolean deleted = service.deleteVendaByLoja(id, loja);
+            @PathVariable String placa) {
+        boolean deleted = service.deleteVendaByLoja(placa, loja);
         Map<String, String> response = new HashMap<>();
         if (deleted) {
             response.put("mensagem", "Venda deletada com sucesso da loja " + loja);

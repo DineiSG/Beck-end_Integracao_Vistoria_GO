@@ -14,5 +14,7 @@ public interface VendasRepository extends CrudRepository<Vendas, String> {
     Optional<Vendas> findByVendedor(String vendedor);
 
     Optional<Vendas> findByUnidade(String unidade);
+
+    void deleteByPlaca(String placa);
 }
 

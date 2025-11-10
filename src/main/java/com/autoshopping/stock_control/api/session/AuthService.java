@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -17,7 +14,7 @@ import org.springframework.web.client.RestTemplate;
 public class AuthService {
 
     @Value("${app.userdata.url}")
-    private String userDataUrl;
+    private String userDataBaseUrl; // ex: https://ambteste.credtudo.com.br/App/LoginExterno/GoStock/
 
     @Value("${app.external.hash}")
     private String externalHash;
@@ -29,45 +26,41 @@ public class AuthService {
     private String sessionCookies;
 
     @Getter
-    private Long currentIdLogin; // ainda pode ser preenchido se existir, mas não é obrigatório
-
-    @Getter
     private JsonNode currentUserData;
 
     @Getter
     private String currentToken;
 
+    // idLogin foi removido completamente — não é necessário
+
     public JsonNode fetchUserData(String token) {
         try {
+            // Monta URL final: base + / + token
+            String url = userDataBaseUrl + (userDataBaseUrl.endsWith("/") ? "" : "/") + token;
+
             HttpHeaders headers = new HttpHeaders();
-            headers.set("Token", token);
             headers.set("Hash", externalHash);
             headers.set("Accept", "application/json");
 
             HttpEntity<Void> request = new HttpEntity<>(headers);
 
-            ResponseEntity<String> response = restTemplate.exchange(userDataUrl, HttpMethod.GET, request, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
 
             if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                log.warn("Resposta inválida do endpoint de userdata. Status: {}", response.getStatusCode());
+                log.warn("Resposta inválida do endpoint userdata. Status: {}", response.getStatusCode());
                 return null;
             }
 
-            String responseBody = response.getBody().trim();
-            JsonNode jsonNode;
-
+            String body = response.getBody().trim();
             try {
-                jsonNode = objectMapper.readTree(responseBody);
+                return objectMapper.readTree(body);
             } catch (Exception e) {
-                log.warn("Resposta não está em JSON. Convertendo para estrutura padrão.");
-                jsonNode = objectMapper.createObjectNode()
-                        .put("raw_response", responseBody);
+                log.warn("Resposta não é JSON válido. Retornando como fallback.");
+                return objectMapper.createObjectNode().put("raw_response", body);
             }
 
-            return jsonNode;
-
         } catch (Exception e) {
-            log.error("Erro ao buscar dados do usuário no endpoint {}: {}", userDataUrl, e.getMessage(), e);
+            log.error("Erro ao buscar dados do usuário: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -76,25 +69,12 @@ public class AuthService {
         this.currentToken = token;
         this.currentUserData = userData;
 
-        // Apenas define currentIdLogin se o campo existir — mas não exige
-        if (userData != null && userData.has("id_login")) {
-            try {
-                this.currentIdLogin = userData.get("id_login").asLong();
-            } catch (Exception e) {
-                log.warn("Campo 'id_login' presente, mas não é um número válido.");
-                this.currentIdLogin = null;
-            }
-        } else {
-            this.currentIdLogin = null;
-        }
-
-        // Tenta extrair cookies, se existirem
+        // Extrai cookies se existirem (opcional)
         this.sessionCookies = (userData != null && userData.has("cookies"))
                 ? userData.get("cookies").asText()
                 : null;
     }
 
-    // ✅ Sessão é válida se houver token e dados do usuário — NÃO exige id_login
     public boolean isSessionValid() {
         return currentToken != null && currentUserData != null;
     }
@@ -102,7 +82,6 @@ public class AuthService {
     public void clearSession() {
         this.currentToken = null;
         this.sessionCookies = null;
-        this.currentIdLogin = null;
         this.currentUserData = null;
         log.info("Sessão limpa");
     }

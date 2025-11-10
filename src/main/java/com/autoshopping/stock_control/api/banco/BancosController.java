@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/v1/banco")
+@RequestMapping("/api/v1/bancos")
 public class BancosController {
 
     private static final Logger logger= LoggerFactory.getLogger(BancosController.class);
