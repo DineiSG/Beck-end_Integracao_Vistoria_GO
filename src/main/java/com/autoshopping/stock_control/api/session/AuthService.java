@@ -9,6 +9,8 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
+
 @Service
 @Slf4j
 public class AuthService {
@@ -35,12 +37,12 @@ public class AuthService {
 
     public JsonNode fetchUserData(String token) {
         try {
-            // Monta URL final: base + / + token
             String url = userDataBaseUrl + (userDataBaseUrl.endsWith("/") ? "" : "/") + token;
 
             HttpHeaders headers = new HttpHeaders();
             headers.set("Hash", externalHash);
             headers.set("Accept", "application/json");
+            // Não definir Accept-Encoding se não quiser lidar com gzip
 
             HttpEntity<Void> request = new HttpEntity<>(headers);
 
@@ -51,11 +53,25 @@ public class AuthService {
                 return null;
             }
 
+            // ✅ Extrair cookies do cabeçalho Set-Cookie
+            List<String> setCookieHeaders = response.getHeaders().get(HttpHeaders.SET_COOKIE);
+            if (setCookieHeaders != null && !setCookieHeaders.isEmpty()) {
+                // Concatenar todos os cookies em uma única string no formato "key1=value1; key2=value2"
+                this.sessionCookies = String.join("; ", setCookieHeaders.stream()
+                        .map(cookie -> cookie.split(";")[0]) // pega apenas "nome=valor", ignora atributos como Path, Secure etc.
+                        .toList());
+                log.debug("Cookies de sessão armazenados: {}", this.sessionCookies);
+            } else {
+                this.sessionCookies = null;
+                log.warn("Nenhum cookie Set-Cookie recebido na resposta");
+            }
+
+            // ✅ Parsear o corpo JSON (dados do usuário)
             String body = response.getBody().trim();
             try {
                 return objectMapper.readTree(body);
             } catch (Exception e) {
-                log.warn("Resposta não é JSON válido. Retornando como fallback.");
+                log.warn("Resposta não é JSON válido: {}", body);
                 return objectMapper.createObjectNode().put("raw_response", body);
             }
 
@@ -68,11 +84,8 @@ public class AuthService {
     public void setCurrentSession(String token, JsonNode userData) {
         this.currentToken = token;
         this.currentUserData = userData;
-
-        // Extrai cookies se existirem (opcional)
-        this.sessionCookies = (userData != null && userData.has("cookies"))
-                ? userData.get("cookies").asText()
-                : null;
+        // ✅ Não tenta ler cookies do JSON — já foram extraídos em fetchUserData()
+        // this.sessionCookies permanece como foi definido em fetchUserData()
     }
 
     public boolean isSessionValid() {

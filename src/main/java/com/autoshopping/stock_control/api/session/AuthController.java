@@ -40,10 +40,7 @@ import org.springframework.web.client.RestTemplate;
             }
 
             JsonNode userData = authService.fetchUserData(tokenRequest.token());
-            if (userData == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body("Falha ao buscar dados do usuário com o token fornecido");
-            }
+            authService.setCurrentSession(tokenRequest.token(), userData);
 
             authService.setCurrentSession(tokenRequest.token(), userData);
 
