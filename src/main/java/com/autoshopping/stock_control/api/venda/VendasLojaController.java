@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -69,6 +70,7 @@ public class VendasLojaController {
     }
 
     // Deletar venda por ID na loja
+    @Transactional
     @DeleteMapping("/{loja}/placa/{placa}")
     public ResponseEntity<Map<String, String>> deleteVendaByLoja(
             @PathVariable String loja,

@@ -2,6 +2,7 @@ package com.autoshopping.stock_control.api.inventario;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -40,6 +41,7 @@ public class InventarioController {
         return ResponseEntity.ok(response);
     }
     /*Deletando uma listagem*/
+    @Transactional
     @DeleteMapping("/id_inventario/{id_inventario}")
     public ResponseEntity<Void> delete(@PathVariable("id_inventario") Integer id_inventario) {
         service.deleteByIdInventario(id_inventario);

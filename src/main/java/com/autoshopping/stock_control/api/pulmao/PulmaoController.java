@@ -1,4 +1,4 @@
-package com.autoshopping.stock_control.api.veiculo;
+package com.autoshopping.stock_control.api.pulmao;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,30 +11,29 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/v1/veiculos")
-public class VeiculosController {
+@RequestMapping("/api/v1/pulmao")
+public class PulmaoController {
 
     @Autowired
-    private VeiculosService service;
+    private PulmaoService service;
 
     /*Buscando todos os veiculos do banco de dados*/
     @GetMapping
-    public ResponseEntity<Iterable<Veiculos>> get(){
-        return ResponseEntity.ok(service.getVeiculos());
+    public ResponseEntity<Iterable<Pulmao>> get(){
+        return ResponseEntity.ok(service.getPulmao());
     }
 
     /*Buscando os veiculos de acordo com criterios*/
 
     @GetMapping("/{id}")
     public ResponseEntity get(@PathVariable("id") Integer id){
-        Optional<Veiculos> veiculos=service.getVeiculosById(id);
-        return veiculos
-                .map(Veiculos -> ResponseEntity.ok(veiculos))
+        Optional<Pulmao> pulmao=service.getPulmaoById(id);
+        return pulmao
+                .map(Pulmao -> ResponseEntity.ok(pulmao))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -64,7 +63,7 @@ public class VeiculosController {
         }
     }
 
-    @GetMapping("/fipe")
+/*    @GetMapping("/fipe")
     public ResponseEntity<Map<String, Object>> getFipe(@RequestParam String placa) {
         HttpClient client = HttpClient.newHttpClient();
 
@@ -127,42 +126,42 @@ public class VeiculosController {
             e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("erro", "Erro ao obter dados para a placa: " + placa, "detalhes", e.getMessage()));
         }
-    }
+    }*/
 
 
     @GetMapping("/unidade/{unidade}")
-    public Iterable<Veiculos>getVeiculosByUnidade(@PathVariable("unidade")String unidade){
-        return service.getVeiculosByUnidade(unidade);
+    public Iterable<Pulmao>getPulmaoByUnidade(@PathVariable("unidade")String unidade){
+        return service.getPulmaoByUnidade(unidade);
     }
 
     @GetMapping("/modelo/{modelo}")
-    public Optional<Veiculos>getVeiculosByModelo(@PathVariable("modelo")String modelo){
-        return service.getVeiculosByModelo(modelo);
+    public Optional<Pulmao>getPulmaoByModelo(@PathVariable("modelo")String modelo){
+        return service.getPulmaoByModelo(modelo);
     }
 
     /*Esse metodo foi criado para auxiliar na fuunção de atualizar um veiculo */
     @GetMapping("/placa/{placa}")
-    public ResponseEntity getVeiculosByPlaca(@PathVariable("placa")String placa){
-        Optional<Veiculos>veiculos=service.getVeiculosByPlaca(placa);
-        return veiculos
-                .map(Veiculos -> ResponseEntity.ok(veiculos))
+    public ResponseEntity getPulmaoByPlaca(@PathVariable("placa")String placa){
+        Optional<Pulmao>pulmao=service.getPulmaoByPlaca(placa);
+        return pulmao
+                .map(Pulmao -> ResponseEntity.ok(pulmao))
                 .orElse(ResponseEntity.notFound().build());
     }
- 
+
     /*Cadastrando novos veiculos*/
     @PostMapping
-    public ResponseEntity post (@RequestBody Veiculos veiculo) {
-        Veiculos novo=service.insert(veiculo);
+    public ResponseEntity post (@RequestBody Pulmao pulmao) {
+        Pulmao novo=service.insert(pulmao);
         return ResponseEntity.ok("Veiculo adicionado com sucesso");
     }
 
     /*Atualizando um veículo*/
     @PutMapping(path="/placa/{placa}")
-    public ResponseEntity put(@PathVariable("placa") String placa, @RequestBody Veiculos veiculo){
-        Veiculos atualizarVeiculo=service.update(veiculo, placa);
+    public ResponseEntity put(@PathVariable("placa") String placa, @RequestBody Pulmao pulmao){
+        Pulmao atualizarPulmao=service.update(pulmao, placa);
         Map<String, Object> response = new HashMap<>();
         response.put("mensagem", "Veiculo atualizado com sucesso");
-        response.put("veiculo", atualizarVeiculo);
+        response.put("veiculo", atualizarPulmao);
         return ResponseEntity.ok(response);
     }
 

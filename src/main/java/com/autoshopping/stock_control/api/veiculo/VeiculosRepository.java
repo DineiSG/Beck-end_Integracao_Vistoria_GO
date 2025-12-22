@@ -12,7 +12,7 @@ public interface VeiculosRepository extends JpaRepository<Veiculos, String> {
 
 	Optional<Veiculos> findById(Integer id);
 
-	Optional<Veiculos> findByUnidade(String unidade);
+	Iterable<Veiculos> findByUnidade(String unidade);
 
 	Optional<Veiculos> findByModelo(String modelo);
 

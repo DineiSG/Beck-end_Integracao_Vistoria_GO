@@ -16,5 +16,7 @@ public class Lojas {
     private String email;
     private String telefone;
     @Column(name = "qtd_veiculos")
-    private String qtdVeiculos;
+    private Integer qtdVeiculos;
+    @Column(name = "qtd_estoque_extra")
+    private Integer qtdEstoqueExtra;
 }

@@ -24,7 +24,7 @@ public class VeiculosService {
         return rep.findAll();
     }
 
-    public Optional<Veiculos> getVeiculosByUnidade(String unidade) {
+    public Iterable<Veiculos> getVeiculosByUnidade(String unidade) {
         return rep.findByUnidade(unidade);
     }
 
